@@ -48,7 +48,7 @@ def get_book_data(url):
     author = driver.find_element(By.CLASS_NAME, "addmd").text
 
     safe_title = re.sub(r'[<>:"/\\|?*]', '_', f"{title} (by {author[1:]})")
-    safe_title = safe_title.strip().replace(' ', '_')  # boşlukları da istersen alt çizgi yap
+    safe_title = safe_title.strip().replace(' ', '_')
     return safe_title
 
 
@@ -65,16 +65,13 @@ def capture_requests(url):
 
     while True:
         try:
-            # checkpoint elementini her defasında yeniden bul
             checkpoint = driver.find_element(By.CLASS_NAME, "pageImageDisplay")
 
-            # artık aynı element mi diye kontrol et (bitiş kontrolü)
             if prev_checkpoint == checkpoint:
                 break
 
             checkpoint.click()
 
-            # ~25 sayfa kadar kaydır
             for _ in range(25):
                 html = driver.find_element(By.TAG_NAME, "body")
                 html.send_keys(Keys.SPACE)
@@ -83,7 +80,7 @@ def capture_requests(url):
             sleep(2)
 
         except Exception as e:
-            print("Bir hata oluştu, tekrar denenecek:", e)
+            print("An error occurred, retrying:", e)
             sleep(2)
             continue
 
