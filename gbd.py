@@ -47,7 +47,10 @@ def get_book_data(url):
     title = driver.find_element(By.CLASS_NAME, "gb-volume-title").text
     author = driver.find_element(By.CLASS_NAME, "addmd").text
 
-    return f"{title} (b{author[1:]})"
+    safe_title = re.sub(r'[<>:"/\\|?*]', '_', f"{title} (by {author[1:]})")
+    safe_title = safe_title.strip().replace(' ', '_')  # boşlukları da istersen alt çizgi yap
+    return safe_title
+
 
 def capture_requests(url):
     """
@@ -57,17 +60,32 @@ def capture_requests(url):
     driver.get(url)
     driver.refresh()
     sleep(2)
-    checkpoint = ""
 
-    while checkpoint != driver.find_element(By.CLASS_NAME, "pageImageDisplay"):
-        checkpoint = driver.find_element(By.CLASS_NAME, "pageImageDisplay")
-        checkpoint.click()
-        # scrolling ~25 pages
-        for i in range(25):
-            html = driver.find_element(By.TAG_NAME, "body")
-            html.click()
-            html.send_keys(Keys.SPACE)
-        sleep(2)
+    prev_checkpoint = None
+
+    while True:
+        try:
+            # checkpoint elementini her defasında yeniden bul
+            checkpoint = driver.find_element(By.CLASS_NAME, "pageImageDisplay")
+
+            # artık aynı element mi diye kontrol et (bitiş kontrolü)
+            if prev_checkpoint == checkpoint:
+                break
+
+            checkpoint.click()
+
+            # ~25 sayfa kadar kaydır
+            for _ in range(25):
+                html = driver.find_element(By.TAG_NAME, "body")
+                html.send_keys(Keys.SPACE)
+
+            prev_checkpoint = checkpoint
+            sleep(2)
+
+        except Exception as e:
+            print("Bir hata oluştu, tekrar denenecek:", e)
+            sleep(2)
+            continue
 
     return str(driver.requests)
 
@@ -229,25 +247,32 @@ ENTER to save them right here.
 
 Your input: """)
 
-    if main_directory == "":
-        main_directory = tempfile.TemporaryDirectory()
+    use_temp = False
+
+    if main_directory.strip() == "":
+        temp_dir = tempfile.TemporaryDirectory()
+        main_directory = temp_dir.name
+        use_temp = True
 
     try:
         new_directory = os.path.join(main_directory, book_data)
         if not os.path.exists(new_directory):
             os.mkdir(new_directory)
-    except:
-        try:
-            new_directory = main_directory
-            if not os.path.exists(new_directory):
-                os.mkdir(new_directory)
-        except:
-            print(f"Invalid input\"{main_directory}\". Please try again, or leave the input blank to use a folder in temp.")
-            step3()
+    except Exception as e:
+        print(f"Invalid input \"{main_directory}\". Error: {e}")
+        print("Please try again or leave the input blank to use a temporary folder.")
+        step3()
+        return
 
     print(f"\nWe will now download all {len(selected_pages)} pages you selected. This will take a minute or two.\n")
     print(f"\nDownload folder is: {new_directory}\n")
+
     download_imgs(selected_pages, cookie, new_directory)
+
+    if use_temp:
+        print(f"\nNOTE: The files are stored in a **temporary directory**: {new_directory}")
+        print("You should copy them somewhere else, as this folder will be deleted automatically when the program exits.\n")
+
 
 if __name__ == "__main__":
     global driver
